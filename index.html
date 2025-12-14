@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no" />
+  <title>Sky Focus</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    body {
+      background: #000;
+    }
+
+    #sky {
+      position: fixed;
+      inset: 0;
+      transition: background 2s linear;
+      will-change: background;
+    }
+
+    #time {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(32px, 8vw, 96px);
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow:
+        0 0 12px rgba(255,255,255,0.25),
+        0 0 32px rgba(255,255,255,0.15);
+      pointer-events: none;
+      z-index: 10;
+      user-select: none;
+    }
+
+    #trees {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 120px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-evenly;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .tree {
+      position: relative;
+      width: 14px;
+      height: 60px;
+    }
+
+    .trunk {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 28px;
+      background: rgba(20, 30, 20, 0.8);
+      border-radius: 2px;
+    }
+
+    .crown {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 28px;
+      height: 28px;
+      background: rgba(15, 40, 20, 0.9);
+      border-radius: 50%;
+    }
+
+    .particle {
+      position: absolute;
+      bottom: 0;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      pointer-events: none;
+      z-index: 6;
+      will-change: transform, opacity;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="sky">
+    <div id="time">00:00:00</div>
+    <div id="trees"></div>
+  </div>
+
+  <script>
+    const PARTICLE_SPEED = 0.15;
+    const PARTICLE_RATE = 500;
+    const MAX_PARTICLES = 120;
+
+    const sky = document.getElementById('sky');
+    const timeEl = document.getElementById('time');
+
+    const colorStops = [
+      { time: 5,  color: [20, 20, 30] },
+      { time: 8,  color: [255, 170, 90] },
+      { time: 18, color: [120, 190, 255] },
+      { time: 21, color: [255, 160, 190] },
+      { time: 24, color: [10, 10, 20] }
+    ];
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function lerpColor(c1, c2, t) {
+      return c1.map((v, i) => Math.round(lerp(v, c2[i], t)));
+    }
+
+    function getSkyColor(hour) {
+      for (let i = 0; i < colorStops.length - 1; i++) {
+        const start = colorStops[i];
+        const end = colorStops[i + 1];
+        if (hour >= start.time && hour <= end.time) {
+          const t = (hour - start.time) / (end.time - start.time);
+          return lerpColor(start.color, end.color, t);
+        }
+      }
+      return colorStops[colorStops.length - 1].color;
+    }
+
+    function updateTimeAndSky() {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const s = now.getSeconds();
+
+      timeEl.textContent =
+        String(h).padStart(2, '0') + ':' +
+        String(m).padStart(2, '0') + ':' +
+        String(s).padStart(2, '0');
+
+      const hourFraction = h + m / 60 + s / 3600;
+      const [r, g, b] = getSkyColor(hourFraction);
+
+      sky.style.background = `linear-gradient(
+        to top,
+        rgb(${r * 0.6}, ${g * 0.6}, ${b * 0.6}),
+        rgb(${r}, ${g}, ${b})
+      )`;
+    }
+
+    const treesContainer = document.getElementById('trees');
+
+    function createTrees() {
+      treesContainer.innerHTML = '';
+      const count = Math.floor(window.innerWidth / 40);
+
+      for (let i = 0; i < count; i++) {
+        const tree = document.createElement('div');
+        tree.className = 'tree';
+
+        const trunk = document.createElement('div');
+        trunk.className = 'trunk';
+
+        const crown = document.createElement('div');
+        crown.className = 'crown';
+
+        tree.appendChild(crown);
+        tree.appendChild(trunk);
+        treesContainer.appendChild(tree);
+      }
+    }
+
+    let particles = [];
+
+    function spawnParticle() {
+      if (particles.length >= MAX_PARTICLES) return;
+
+      const p = document.createElement('div');
+      p.className = 'particle';
+
+      const x = Math.random() * window.innerWidth;
+      const size = Math.random() * 4 + 3;
+
+      p.style.left = x + 'px';
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.opacity = Math.random() * 0.5 + 0.3;
+
+      document.body.appendChild(p);
+
+      particles.push({
+        el: p,
+        x,
+        y: window.innerHeight,
+        vx: (Math.random() - 0.5) * 0.05,
+        vy: PARTICLE_SPEED * (Math.random() * 0.5 + 0.75)
+      });
+    }
+
+    function animateParticles() {
+      const centerY = window.innerHeight / 2;
+
+      particles = particles.filter(p => {
+        p.y -= p.vy * 10;
+        p.x += p.vx * 10;
+
+        p.el.style.transform = `translate(${p.x}px, ${p.y}px)`;
+
+        if (p.y < centerY) {
+          p.el.style.opacity -= 0.02;
+        }
+
+        if (p.y < centerY - 80 || p.el.style.opacity <= 0) {
+          p.el.remove();
+          return false;
+        }
+        return true;
+      });
+
+      requestAnimationFrame(animateParticles);
+    }
+
+    createTrees();
+    updateTimeAndSky();
+    animateParticles();
+
+    setInterval(updateTimeAndSky, 1000);
+    setInterval(spawnParticle, PARTICLE_RATE);
+    window.addEventListener('resize', createTrees);
+  </script>
+</body>
+  </html>
+  
